@@ -3,6 +3,179 @@
 }
 
 <div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+    <h1 class="display-4">DATA</h1>
+    <p>Lorem ipsun dolor sit amet, consectetur adipiscing elit.</p>
 </div>
+
+<div class="container">
+    <div class="row">
+        <div class="col-lg-6">
+            <table class="table table-sm" id="tbDados">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>First Name</th>
+                        <th>Last Name</th>
+                        <th>Participation</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="col-lg-6">
+            <canvas id="pizzaChart" width="300" height="300"></canvas>
+        </div>
+    </div>
+</div>
+
+@section Scripts{
+    <script>
+        var DadosChart = {
+            Nomes: [],
+            Valores: []
+        };
+
+        var pizzaChart;
+
+        $(() => {
+             $.ajax({
+                url: "@Url.Action("Get","Home")",
+                type: "get",
+                success: (res) => {
+                    res.List.map((l) => {
+                        AddChart(l);
+                    });
+                }
+             });
+
+            $('#formData').submit(function (e) {
+                e.preventDefault();
+
+                var formArray = $("#formData").serializeArray();
+                var data = {};
+
+                for (var i = 0; i < formArray.length; i++) {
+                    data[formArray[i]['name']] = formArray[i]['value'];
+                }
+
+                var totalAtual = DadosChart.Valores.reduce((a, b) => parseInt(a) + parseInt(b), 0);
+
+                if (totalAtual + parseInt(data.Participation) > 100) {
+                    var msg = "";
+                    if (totalAtual < 100)
+                        msg = "Participation cannot exceed 100%. You can still add " + (100 - totalAtual) + "%";
+                    else
+                        msg = "The participation already has 100%. To add, delete some value.";
+
+                    return Swal.fire("", msg, "warning");
+                }
+
+                $.ajax({
+                    url: "@Url.Action("Add","Home")",
+                    data: data,
+                    type: "post",
+                    success: (res) => {
+                        if (res.status) {
+                            AddChart(data);
+
+                            return Swal.fire("", res.msg, "success");
+                        }
+                        else
+                            return Swal.fire("", res.msg, "error");
+                    }
+                });
+            });
+        });
+
+        function DeleteData(t, id) {
+             $.ajax({
+                    url: "@Url.Action("Delete","Home")",
+                    data: id,
+                    type: "post",
+                    success: (res) => {
+                        if (res.status) {
+                            RemoveLine(t);
+
+                            return Swal.fire("", res.msg, "success");
+                        }
+                        else
+                            return Swal.fire("", res.msg, "error");
+                    }
+                });
+        }
+
+        function RemoveLine(t) {
+            var elem = $(t).parent().parent();
+            var fname = elem[0].cells[1].innerText;
+            var lname = elem[0].cells[2].innerText;
+            var part = elem[0].cells[3].innerText;
+
+            elem.remove();
+
+            var name = fname + " " + lname;
+            var indexName = DadosChart.Nomes.indexOf(name);
+            DadosChart.Nomes.splice(indexName, 1);
+
+            var indexValor = DadosChart.Valores.indexOf(part);
+            DadosChart.Valores.splice(indexValor, 1);
+
+            GenerateChart();
+        }
+
+        function AddChart(data) {
+            var num = $("#tbDados tbody")[0].rows.length + 1;
+
+            $("#tbDados tbody").append('<tr>' +
+                '<td>' + num + '</td>' +
+                '<td>' + data.FirstName + '</td>' +
+                '<td>' + data.LastName + '</td>' +
+                '<td>' + data.Participation + '%</td>' +
+                '<td><a class="text-danger" onclick="DeleteData(this,'+data.Id+')" title="Delete data">'+
+                '<svg xmlns = "http://www.w3.org/2000/svg" width = "16" height = "16" fill = "currentColor" class= "bi bi-trash-fill" viewBox = "0 0 16 16" >' +
+                '<path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1H2.5zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5zM8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5zm3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0z" />' +
+                '</svg >'+
+                '</a></td > ' +
+                '</tr>'
+            );
+            DadosChart.Nomes.push(data.FirstName + " " + data.LastName);
+            DadosChart.Valores.push(data.Participation);
+
+            $('.form-control').val("");
+            $("#FirstName").focus();
+
+            GenerateChart();
+        }
+
+        function GenerateChart() {
+            var ctx = $('#pizzaChart');
+
+            if (pizzaChart)
+                pizzaChart.destroy();
+
+            pizzaChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: DadosChart.Nomes,
+                    datasets: [{
+                        label: '',
+                        data: DadosChart.Valores,
+                        backgroundColor: [
+                            '#EF5350',
+                            '#7E57C2',
+                            '#29B6F6',
+                            '#66BB6A',
+                            '#FFEE58',
+                            '#FF7043',
+                            '#78909C'
+                        ],
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                }
+            });
+        }
+    </script>
+}
